@@ -17,17 +17,20 @@ import java.net.URL;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 public class App implements RequestHandler<Object, Object> {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final LambdaLogger LOG = LambdaRuntime.getLogger();
     private static final MediaType MEDIA_TYPE = MediaType.parse("application/json; charset=utf-8");
-    private static final Map<String, String> feeds = new HashMap<String, String>() {{
+    private static final Map<String, String> feeds = new LinkedHashMap<String, String>() {{
         put("Blog post", "https://www.elastic.co/blog/feed");
         put("New Release", "https://www.elastic.co/downloads/past-releases/feed");
         put("Press release", "https://www.elastic.co/about/press/feed");
+        put("Reddit /r/elasticsearch", "https://www.reddit.com/r/elasticsearch/.rss?format=xml/feed");
+        put("Reddit /r/elastic", "https://www.reddit.com/r/elastic/.rss?format=xml/feed");
     }};
 
     public Object handleRequest(final Object input, final Context context) {
@@ -52,15 +55,20 @@ public class App implements RequestHandler<Object, Object> {
         Remark remark = new Remark();
         String webhookUrl = System.getenv("WEBHOOK_URL");
         feed.getEntries().forEach(syndEntry -> {
-            Date publishedDate = syndEntry.getPublishedDate();
-            if (publishedDate != null) {
-                Instant instant = publishedDate.toInstant();
+            Date postDate = Optional.ofNullable(syndEntry.getPublishedDate())
+                    .orElse(syndEntry.getUpdatedDate());
+            if (postDate != null) {
+                Instant instant = postDate.toInstant();
                 if (instant.isAfter(Instant.now()
                         .minus(1, ChronoUnit.HOURS))) {
                     try {
+                        String contentHtml = Optional.ofNullable(syndEntry.getDescription())
+                                .orElse(syndEntry.getContents()
+                                        .get(0))
+                                .getValue();
                         Embed embed = new Embed()
                                 .setTitle(substring(syndEntry.getTitle(), 255))
-                                .setDescription(substring(remark.convert(syndEntry.getDescription().getValue()), 1000))
+                                .setDescription(substring(remark.convert(contentHtml), 1000))
                                 .setUrl(syndEntry.getUri());
                         DiscordRequest discordRequest = new DiscordRequest()
                                 .setUsername(feedName);
@@ -80,5 +88,9 @@ public class App implements RequestHandler<Object, Object> {
 
     private String substring(String str, int limit) {
         return str != null && str.length() > limit ? str.substring(0, 255) : str;
+    }
+
+    public static void main(String[] str) {
+        new App().handleRequest(null, null);
     }
 }
