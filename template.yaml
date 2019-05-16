@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  discord-elastic-feed
+Globals:
+  Function:
+    Timeout: 90
+Parameters:
+  WebhookUrl:
+    Type: String
+
+Resources:
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: FeedScanner/target/FeedScanner-1.0.jar
+      Handler: meshuga.discord.App::handleRequest
+      Runtime: java8
+      MemorySize: 512
+      Environment:
+        Variables:
+          WEBHOOK_URL:
+            Ref: WebhookUrl
+      Events:
+        Scheduler:
+          Properties:
+            Schedule: rate(1 hour)
+          Type: Schedule
