@@ -6,6 +6,7 @@ import com.amazonaws.services.lambda.runtime.LambdaRuntime;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.overzealous.remark.Remark;
+import com.rometools.rome.feed.synd.SyndContentImpl;
 import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.io.FeedException;
 import com.rometools.rome.io.SyndFeedInput;
@@ -60,16 +61,16 @@ public class App implements RequestHandler<Object, Object> {
             if (postDate != null) {
                 Instant instant = postDate.toInstant();
                 if (instant.isAfter(Instant.now()
-                        .minus(1, ChronoUnit.HOURS))) {
+                        .minus(24, ChronoUnit.HOURS))) {
                     try {
                         String contentHtml = Optional.ofNullable(syndEntry.getDescription())
-                                .orElse(syndEntry.getContents()
-                                        .get(0))
+                                .orElseGet(() -> syndEntry.getContents().isEmpty() ?
+                                        new SyndContentImpl() : syndEntry.getContents().get(0))
                                 .getValue();
                         Embed embed = new Embed()
                                 .setTitle(substring(syndEntry.getTitle(), 255))
                                 .setDescription(substring(remark.convert(contentHtml), 1000))
-                                .setUrl(syndEntry.getUri());
+                                .setUrl(syndEntry.getLink());
                         DiscordRequest discordRequest = new DiscordRequest()
                                 .setUsername(feedName);
                         discordRequest.getEmbeds().add(embed);
