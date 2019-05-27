@@ -6,6 +6,7 @@ import java.util.List;
 public class DiscordRequest {
     private boolean tts;
     private String username;
+    private String content;
     private List<Embed> embeds = new ArrayList<>();
 
     public boolean isTts() {
@@ -23,6 +24,15 @@ public class DiscordRequest {
 
     public DiscordRequest setUsername(String username) {
         this.username = username;
+        return this;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public DiscordRequest setContent(String content) {
+        this.content = content;
         return this;
     }
 

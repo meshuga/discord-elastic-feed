@@ -10,19 +10,42 @@ Parameters:
     Type: String
 
 Resources:
-  HelloWorldFunction:
+  DailyScheduler:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: FeedScanner/target/FeedScanner-1.0.jar
       Handler: meshuga.discord.App::handleRequest
       Runtime: java8
-      MemorySize: 512
+      MemorySize: 256
       Environment:
         Variables:
           WEBHOOK_URL:
             Ref: WebhookUrl
+          SCHEDULE_HOURS: 24
       Events:
         Scheduler:
           Properties:
             Schedule: rate(1 day)
+            Input: '{"Blog post": "https://www.elastic.co/blog/feed",
+            "New Release": "https://www.elastic.co/downloads/past-releases/feed",
+            "Press release": "https://www.elastic.co/about/press/feed"}'
+          Type: Schedule
+  HourlyScheduler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: FeedScanner/target/FeedScanner-1.0.jar
+      Handler: meshuga.discord.App::handleRequest
+      Runtime: java8
+      MemorySize: 256
+      Environment:
+        Variables:
+          WEBHOOK_URL:
+            Ref: WebhookUrl
+          SCHEDULE_HOURS: 1
+      Events:
+        Scheduler:
+          Properties:
+            Schedule: rate(1 hour)
+            Input: '{"Reddit /r/elasticsearch": "https://www.reddit.com/r/elasticsearch/.rss?format=xml/feed",
+            "Reddit /r/elastic": "https://www.reddit.com/r/elastic/.rss?format=xml/feed"}'
           Type: Schedule

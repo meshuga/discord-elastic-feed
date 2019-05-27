@@ -12,13 +12,13 @@ import com.rometools.rome.io.FeedException;
 import com.rometools.rome.io.SyndFeedInput;
 import com.rometools.rome.io.XmlReader;
 import okhttp3.*;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
 import java.net.URL;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -26,15 +26,10 @@ public class App implements RequestHandler<Object, Object> {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final LambdaLogger LOG = LambdaRuntime.getLogger();
     private static final MediaType MEDIA_TYPE = MediaType.parse("application/json; charset=utf-8");
-    private static final Map<String, String> feeds = new LinkedHashMap<String, String>() {{
-        put("Blog post", "https://www.elastic.co/blog/feed");
-        put("New Release", "https://www.elastic.co/downloads/past-releases/feed");
-        put("Press release", "https://www.elastic.co/about/press/feed");
-        put("Reddit /r/elasticsearch", "https://www.reddit.com/r/elasticsearch/.rss?format=xml/feed");
-        put("Reddit /r/elastic", "https://www.reddit.com/r/elastic/.rss?format=xml/feed");
-    }};
 
+    @SuppressWarnings("unchecked")
     public Object handleRequest(final Object input, final Context context) {
+        Map<String, String> feeds = (Map) input;
         OkHttpClient client = new OkHttpClient();
         feeds.entrySet()
                 .forEach(feedEntry -> processFeed(feedEntry, client));
@@ -55,25 +50,30 @@ public class App implements RequestHandler<Object, Object> {
     private void publishNews(SyndFeed feed, String feedName, OkHttpClient client) {
         Remark remark = new Remark();
         String webhookUrl = System.getenv("WEBHOOK_URL");
+        int scheduleHours = Integer.parseInt(System.getenv("SCHEDULE_HOURS"));
         feed.getEntries().forEach(syndEntry -> {
             Date postDate = Optional.ofNullable(syndEntry.getPublishedDate())
                     .orElse(syndEntry.getUpdatedDate());
             if (postDate != null) {
                 Instant instant = postDate.toInstant();
                 if (instant.isAfter(Instant.now()
-                        .minus(24, ChronoUnit.HOURS))) {
+                        .minus(scheduleHours, ChronoUnit.HOURS))) {
                     try {
                         String contentHtml = Optional.ofNullable(syndEntry.getDescription())
                                 .orElseGet(() -> syndEntry.getContents().isEmpty() ?
                                         new SyndContentImpl() : syndEntry.getContents().get(0))
                                 .getValue();
                         Embed embed = new Embed()
-                                .setTitle(substring(syndEntry.getTitle(), 255))
-                                .setDescription(substring(remark.convert(contentHtml), 1000))
+                                .setTitle(StringUtils.left(syndEntry.getTitle(), 255))
+                                .setDescription(StringUtils.left(remark.convert(contentHtml), 1000))
                                 .setUrl(syndEntry.getLink());
                         DiscordRequest discordRequest = new DiscordRequest()
                                 .setUsername(feedName);
-                        discordRequest.getEmbeds().add(embed);
+                        if (feedName.contains("Reddit")) {
+                            discordRequest.getEmbeds().add(embed);
+                        } else {
+                            discordRequest.setContent(syndEntry.getLink());
+                        }
                         Call call = client.newCall(new Request.Builder()
                                 .url(webhookUrl)
                                 .post(RequestBody.create(MEDIA_TYPE, MAPPER.writeValueAsString(discordRequest)))
@@ -85,13 +85,5 @@ public class App implements RequestHandler<Object, Object> {
                 }
             }
         });
-    }
-
-    private String substring(String str, int limit) {
-        return str != null && str.length() > limit ? str.substring(0, 255) : str;
-    }
-
-    public static void main(String[] str) {
-        new App().handleRequest(null, null);
     }
 }
