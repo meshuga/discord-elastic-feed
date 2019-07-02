@@ -59,17 +59,18 @@ public class App implements RequestHandler<Object, Object> {
                 if (instant.isAfter(Instant.now()
                         .minus(scheduleHours, ChronoUnit.HOURS))) {
                     try {
-                        String contentHtml = Optional.ofNullable(syndEntry.getDescription())
-                                .orElseGet(() -> syndEntry.getContents().isEmpty() ?
-                                        new SyndContentImpl() : syndEntry.getContents().get(0))
-                                .getValue();
-                        Embed embed = new Embed()
-                                .setTitle(StringUtils.left(syndEntry.getTitle(), 255))
-                                .setDescription(StringUtils.left(remark.convert(contentHtml), 1000))
-                                .setUrl(syndEntry.getLink());
                         DiscordRequest discordRequest = new DiscordRequest()
                                 .setUsername(feedName);
                         if (feedName.contains("Reddit")) {
+                            String[] redditContent = Optional.ofNullable(syndEntry.getDescription())
+                                    .orElseGet(() -> syndEntry.getContents().isEmpty() ?
+                                            new SyndContentImpl() : syndEntry.getContents().get(0))
+                                    .getValue().split("submitted by");
+                            String contentHtml = redditContent.length > 0 ? redditContent[0] : "";
+                            Embed embed = new Embed()
+                                    .setTitle(StringUtils.left(syndEntry.getTitle(), 255))
+                                    .setDescription(StringUtils.left(remark.convert(contentHtml), 1000))
+                                    .setUrl(syndEntry.getLink());
                             discordRequest.getEmbeds().add(embed);
                         } else {
                             discordRequest.setContent(syndEntry.getLink());
